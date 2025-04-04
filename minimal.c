@@ -2,11 +2,6 @@
 #include "CH573SFR.h"
 
 #define SLEEPTIME_MS 300
-#ifndef DEEP_SLEEP // 'make deepsleep' will set this to 1
-#define DEEP_SLEEP   0 // go into deep sleep instead of just waiting for SysTick (this will make the debug interface inoperable)
-#endif
-
-#define __HIGH_CODE __attribute__((section(".highcode")))
 
 #define SYS_SAFE_ACCESS(a)  do { R8_SAFE_ACCESS_SIG = SAFE_ACCESS_SIG1; \
 								 R8_SAFE_ACCESS_SIG = SAFE_ACCESS_SIG2; \
@@ -40,40 +35,23 @@ typedef struct __attribute__((packed)) {
 #define SysTick_CTRL_TICKINT_Msk      (1 << 1)
 #define SysTick_CTRL_ENABLE_Msk       (1 << 0)
 
-//#define R32_CLK_SYS_CFG     (*((PUINT32V)0x40001008))  // RWA, system clock configuration, SAM
-//#define  RB_TX_32M_PWR_EN   0x40000                    // RWA, extern 32MHz HSE power contorl
-//#define  RB_PLL_PWR_EN      0x100000                   // RWA, PLL power control
+#define R32_CLK_SYS_CFG     (*((PUINT32V)0x40001008))  // RWA, system clock configuration, SAM
+#define  RB_TX_32M_PWR_EN   0x40000                    // RWA, extern 32MHz HSE power contorl
+#define  RB_PLL_PWR_EN      0x100000                   // RWA, PLL power control
 void Clock60MHz() {
 	SYS_SAFE_ACCESS(
 		R8_PLL_CONFIG &= ~(1 << 5);
-		// R32_CLK_SYS_CFG = (1 << 6) | (0x4a & 0x1f) | RB_TX_32M_PWR_EN | RB_PLL_PWR_EN; // 60MHz = 0x4a
+		R32_CLK_SYS_CFG = (1 << 6) | (0x48 & 0x1f) | RB_TX_32M_PWR_EN | RB_PLL_PWR_EN; // 60MHz = 0x48
 	);
 
-	if(!(R8_HFCK_PWR_CTRL & RB_CLK_PLL_PON))
-	{
-		SYS_SAFE_ACCESS(
-			R8_HFCK_PWR_CTRL |= RB_CLK_PLL_PON; // PLL power on
-		);
-
-		for(int i = 0; i < 2000; i++) {
-			asm volatile ("nop\nnop");
-		}
-	}
-	SYS_SAFE_ACCESS(
-		R16_CLK_SYS_CFG = (1 << 6) | (0x4a & 0x1f);
-	);
-
-	asm volatile ("nop\nnop\nnop\nnop");
-	
-	SYS_SAFE_ACCESS(
-		R8_FLASH_CFG = 0X53;
-	);
+	asm volatile ("nop\nnop\nnop\nnop");	
+	R8_FLASH_CFG = 0x53;
 }
 
 void DelayMs(int ms) {
 	//uint64_t targend = SysTick->CNT + (ms * 60 * 1000); // 60MHz clock
 	//while( ((int64_t)( SysTick->CNT - targend )) < 0 );
-	for(int i = 0; i < ms*833; i++) asm volatile ("nop\nnop");
+	for(int i = 0; i < ms*600; i++) asm volatile ("nop\nnop");
 }
 
 void blink(int n) {
@@ -122,6 +100,7 @@ int main(void) {
 					SysTick_CTRL_ENABLE_Msk; /* Enable SysTick IRQ and SysTick Timer */
 
 	blink(5);
+	print("~ ch573 ~", 9, TRUE);
 
 	while(1) {
 		DelayMs(SLEEPTIME_MS -33);
