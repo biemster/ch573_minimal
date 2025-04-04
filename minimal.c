@@ -90,6 +90,7 @@ void print_bytes(uint8_t data[], int size) {
 	print(0, 0, /*endl*/TRUE);
 }
 
+#define MSG "~ ch573 ~"
 int main(void) {
 	Clock60MHz();
 	GPIOA_ModeCfg_Out(GPIO_Pin_8);
@@ -100,7 +101,7 @@ int main(void) {
 					SysTick_CTRL_ENABLE_Msk; /* Enable SysTick IRQ and SysTick Timer */
 
 	blink(5);
-	print("~ ch573 ~", 9, TRUE);
+	print(MSG, sizeof(MSG), TRUE);
 
 	while(1) {
 		DelayMs(SLEEPTIME_MS -33);
