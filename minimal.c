@@ -144,6 +144,6 @@ int main(void) {
 	while(1) {
 		DelayMs(SLEEPTIME_MS -33);
 		blink(1); // 33 ms
-		print_bytes((uint8_t*)(SysTick->CNT), 8);
+		print_bytes((uint8_t*)&(SysTick->CNT), 8);
 	}
 }
