@@ -18,14 +18,46 @@
 #define GPIOA_SetBits(pin)     (R32_PA_OUT |= (pin))
 #define GPIOA_ModeCfg_Out(pin) R32_PA_PD_DRV &= ~(pin); R32_PA_DIR |= (pin)
 
+#define __I  volatile const  /*!< defines 'read only' permissions     */
+#define __O  volatile        /*!< defines 'write only' permissions     */
+#define __IO volatile        /*!< defines 'read / write' permissions   */
+/* memory mapped structure for Program Fast Interrupt Controller (PFIC) */
 typedef struct __attribute__((packed)) {
-	volatile uint32_t CTLR;
-	volatile uint64_t CNT;
-	volatile uint64_t CMP;
-	volatile uint32_t CNTFG;
+	__I uint32_t  ISR[8];
+	__I uint32_t  IPR[8];
+	__IO uint32_t ITHRESDR;
+	__IO uint32_t FIBADDRR;
+	__IO uint32_t CFGR;
+	__I uint32_t  GISR;
+	uint8_t       RESERVED0[0x10];
+	__IO uint32_t FIOFADDRR[4];
+	uint8_t       RESERVED1[0x90];
+	__O uint32_t  IENR[8];
+	uint8_t       RESERVED2[0x60];
+	__O uint32_t  IRER[8];
+	uint8_t       RESERVED3[0x60];
+	__O uint32_t  IPSR[8];
+	uint8_t       RESERVED4[0x60];
+	__O uint32_t  IPRR[8];
+	uint8_t       RESERVED5[0x60];
+	__IO uint32_t IACTR[8];
+	uint8_t       RESERVED6[0xE0];
+	__IO uint8_t  IPRIOR[256];
+	uint8_t       RESERVED7[0x810];
+	__IO uint32_t SCTLR;
+} PFIC_Type;
+
+typedef struct __attribute__((packed)) {
+	__IO uint32_t CTLR;
+	__IO uint64_t CNT;
+	__IO uint64_t CMP;
+	__IO uint32_t CNTFG;
 } SysTick_Type;
 
 #define CORE_PERIPH_BASE              (0xE0000000) /* System peripherals base address in the alias region */
+#define PFIC_BASE                     (CORE_PERIPH_BASE + 0xE000)
+#define PFIC                          ((PFIC_Type *) PFIC_BASE)
+#define NVIC                          PFIC
 
 #define SysTick_BASE                  (CORE_PERIPH_BASE + 0xF000)
 #define SysTick                       ((SysTick_Type *) SysTick_BASE)
@@ -34,6 +66,10 @@ typedef struct __attribute__((packed)) {
 #define SysTick_CTRL_CLKSOURCE_Msk    (1 << 2)
 #define SysTick_CTRL_TICKINT_Msk      (1 << 1)
 #define SysTick_CTRL_ENABLE_Msk       (1 << 0)
+
+void NVIC_EnableIRQ(IRQn_Type IRQn) {
+	NVIC->IENR[((uint32_t)(IRQn) >> 5)] = (1 << ((uint32_t)(IRQn) & 0x1F));
+}
 
 #define R32_CLK_SYS_CFG     (*((PUINT32V)0x40001008))  // RWA, system clock configuration, SAM
 #define  RB_TX_32M_PWR_EN   0x40000                    // RWA, extern 32MHz HSE power contorl
@@ -49,8 +85,8 @@ void Clock60MHz() {
 }
 
 void DelayMs(int ms) {
-	//uint64_t targend = SysTick->CNT + (ms * 60 * 1000); // 60MHz clock
-	//while( ((int64_t)( SysTick->CNT - targend )) < 0 );
+	// uint64_t targend = SysTick->CNT + (ms * 60 * 1000); // 60MHz clock
+	// while( ((int64_t)( SysTick->CNT - targend )) < 0 );
 	for(int i = 0; i < ms*600; i++) asm volatile ("nop\nnop");
 }
 
@@ -95,6 +131,8 @@ int main(void) {
 	Clock60MHz();
 	GPIOA_ModeCfg_Out(GPIO_Pin_8);
 	GPIOA_SetBits(GPIO_Pin_8);
+	SysTick->CMP = 0;
+	NVIC_EnableIRQ(SysTick_IRQn);
 	SysTick->CTLR = SysTick_CTRL_RELOAD_Msk |
 					SysTick_CTRL_CLKSOURCE_Msk |
 					SysTick_CTRL_TICKINT_Msk |
@@ -106,5 +144,6 @@ int main(void) {
 	while(1) {
 		DelayMs(SLEEPTIME_MS -33);
 		blink(1); // 33 ms
+		print_bytes((uint8_t*)(SysTick->CNT), 8);
 	}
 }
